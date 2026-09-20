@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>POLAROID</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Noto+Sans+KR:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+html,body{height:100%}
+body{background:#000;color:#fff;font-family:"Noto Sans KR",system-ui,sans-serif;font-size:14px;letter-spacing:.03em;overflow:hidden}
+.view{position:fixed;inset:0;display:flex;flex-direction:column}
+.hide{display:none!important}
+.bar{display:flex;gap:8px;align-items:center;justify-content:center;padding:14px 12px 10px;flex:none;overflow-x:auto}
+button{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.75);border-radius:2px;padding:9px 14px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+button.on{background:#fff;color:#000;border-color:#fff}
+button:disabled{opacity:.25}
+.stage{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;min-height:0}
+.frame{position:relative;border:1px solid #fff;overflow:hidden}
+#v{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+#wbOv{position:absolute;inset:0;mix-blend-mode:multiply;pointer-events:none}
+.grid{position:absolute;inset:0;pointer-events:none}
+.grid i{position:absolute;background:rgba(255,255,255,.22)}
+.err{position:absolute;padding:24px;text-align:center;line-height:1.9;opacity:.75;font-size:13px}
+
+.ctl{flex:none}
+.ctl.over{position:absolute;left:0;right:0;bottom:0;z-index:5;background:linear-gradient(to top,rgba(0,0,0,.78),rgba(0,0,0,.55) 60%,transparent)}
+.chips{display:flex;gap:7px;overflow-x:auto;padding:8px 12px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;border-color:rgba(255,255,255,.35);font-size:12px;padding:8px 13px}
+.chips button.on{border-color:#fff;background:#fff;color:#000}
+.dialbox{height:64px;position:relative}
+.dialbox canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.lens{display:flex;gap:9px;justify-content:center;align-items:center;padding:6px 12px 0;flex:none}
+.lens button{width:48px;height:48px;border-radius:50%;padding:0;font-size:12px;border-color:rgba(255,255,255,.4)}
+.lens button.on{background:#fff;color:#000}
+.foot{display:flex;align-items:center;justify-content:space-between;padding:12px 24px calc(14px + env(safe-area-inset-bottom));flex:none}
+.shutter{width:76px;height:76px;border-radius:50%;border:2px solid #fff;background:transparent;padding:0}
+.shutter:active{background:#fff}
+.count{width:80px;font-size:12px;opacity:.65;letter-spacing:.1em}
+.count.dev{opacity:1}
+.zside{width:80px;text-align:right;font-size:12px;opacity:.65}
+
+.wrap{position:relative}
+#pv{display:block;width:100%;height:100%;touch-action:none}
+.hint{text-align:center;opacity:.55;font-size:12px;padding:10px 24px;line-height:1.7;flex:none}
+
+.capField{max-height:46vh;overflow-y:auto;padding:8px 12px 14px;display:flex;flex-direction:column;gap:10px}
+.penScroll{overflow-x:auto;overflow-y:hidden}
+#capPen{background:#fff;display:block;touch-action:none}
+.penTools{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.penTools button{font-size:12px;padding:8px 12px}
+#capIn{width:100%;background:transparent;border:none;border-bottom:1px solid #fff;color:#fff;font:inherit;padding:10px 2px;outline:none;text-align:center}
+.metaRow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;align-items:center}
+
+.galGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px;width:100%}
+.galGrid img{width:100%;aspect-ratio:.6;object-fit:cover;border:1px solid rgba(255,255,255,.25)}
+
+.toast{position:fixed;left:50%;bottom:calc(36px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#fff;color:#000;padding:10px 18px;font-size:13px;border-radius:2px;opacity:0;transition:.25s;pointer-events:none;z-index:99}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- ===== CAMERA ===== -->
+<div id="cam" class="view">
+  <div class="bar">
+    <button id="ratio">3:5</button>
+    <button id="flip">FLIP</button>
+    <button id="grid">GRID</button>
+    <button id="evBtn" class="hide">노출</button>
+    <button id="galBtn">사진첩</button>
+  </div>
+  <div class="stage" id="camStage">
+    <div class="frame" id="frame">
+      <video id="v" autoplay playsinline muted></video>
+      <div id="wbOv"></div>
+      <div class="grid hide" id="gridLines"></div>
+    </div>
+    <div class="err hide" id="err"></div>
+    <div class="ctl over hide" id="evStrip">
+      <div class="dialbox" id="camDial"></div>
+    </div>
+  </div>
+  <div class="lens" id="lensRow"></div>
+  <div class="foot">
+    <span class="count" id="count">10 / 10</span>
+    <button id="shot" class="shutter"></button>
+    <span class="zside" id="zLabel">×1.0</span>
+  </div>
+</div>
+
+<!-- ===== EDIT (보정 → 멘트) ===== -->
+<div id="edit" class="view hide">
+  <div class="bar">
+    <button id="eLeft">다시 찍기</button>
+    <button id="eRight">다음</button>
+  </div>
+  <div class="stage" id="editStage"><div class="wrap" id="wrap"><canvas id="pv"></canvas></div></div>
+  <div class="ctl" id="editCtl">
+    <div class="chips" id="editChips"></div>
+    <div class="dialbox" id="editDial"></div>
+    <div class="capField hide" id="capPanel"></div>
+  </div>
+</div>
+
+<!-- ===== OUTPUT ===== -->
+<div id="out" class="view hide">
+  <div class="bar" id="outBar"></div>
+  <div class="stage"><img id="outImg" alt="polaroid" style="max-width:100%;max-height:100%;object-fit:contain"></div>
+  <div class="hint">사진을 길게 눌러 <b>이미지 저장</b>을 선택하면 갤러리에 저장됩니다.</div>
+</div>
+
+<!-- ===== GALLERY ===== -->
+<div id="gallery" class="view hide">
+  <div class="bar"><button id="galBack">← 카메라</button></div>
+  <div class="stage" style="align-items:flex-start;overflow-y:auto">
+    <div class="galGrid" id="galGrid"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const DPR=Math.min(window.devicePixelRatio||1,3);
+const toast=m=>{const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),1700);};
+function showView(id){$$('.view').forEach(v=>v.classList.add('hide'));$('#'+id).classList.remove('hide');}
+
+/* ================= state ================= */
+let portrait=true, facing='environment', stream=null, track=null, caps={}, shot=null;
+let camZoom=1, zUnit=1, zMin=1, zMax=1, nativeZoom=false;
+const camWB=5500; let camEV=null;
+let fx='ORIGINAL', font='pen', caption='';
+let adj={b:0,c:0,s:0,t:0,ti:0,z:100,grain:0,vig:0,fxAmt:100};
+let metaOn={date:true,time:true,wx:false}, wxIcon='☀', wx=null;
+let panX=.5, panY=.5;
+const PAD=60, BOT=300, LIMIT=10;
+const dims=()=>portrait?{pw:960,ph:1600}:{pw:1600,ph:960};
+
+/* ================= 하루 제한 / 개발자 모드 (길게 누르기 + 비밀번호) ================= */
+const today=()=>{const n=new Date();return n.getFullYear()+'-'+(n.getMonth()+1)+'-'+n.getDate();};
+const isDev=()=>localStorage.getItem('pola_dev')==='1';
+const used=()=>+(localStorage.getItem('pola_used_'+today())||0);
+const setUsed=n=>{localStorage.setItem('pola_used_'+today(),Math.max(0,n));updateCount();};
+function updateCount(){
+  const c=$('#count');
+  if(isDev()){c.textContent='DEV ∞';c.classList.add('dev');$('#shot').disabled=false;return;}
+  c.classList.remove('dev');
+  const left=LIMIT-used(); c.textContent=left+' / '+LIMIT; $('#shot').disabled=left<=0;
+}
+function toggleDev(){const d=!isDev();localStorage.setItem('pola_dev',d?'1':'0');updateCount();toast(d?'개발자 모드 ON · 촬영 무제한':'개발자 모드 OFF · 하루 10장');}
+(()=>{
+  const c=$('#count'); let timer=null;
+  c.addEventListener('pointerdown',()=>{clearTimeout(timer);timer=setTimeout(()=>{
+    const pw=prompt('개발자 모드 비밀번호');
+    if(pw===null)return;
+    if(pw==='605605') toggleDev(); else toast('비밀번호가 틀렸습니다');
+  },3000);});
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>c.addEventListener(ev,()=>clearTimeout(timer)));
+})();
+
+/* ================= 화이트밸런스 / 틴트 (기본 5500K 고정) ================= */
+function wbColor(K){
+  const d=clamp((K-5500)/3500,-1,1), a=Math.abs(d);
+  if(d>=0) return 'rgb(255,'+Math.round(255-a*26)+','+Math.round(255-a*118)+')';
+  return 'rgb('+Math.round(255-a*118)+','+Math.round(255-a*34)+',255)';
+}
+const wbLift=K=>1+Math.abs(clamp((K-5500)/3500,-1,1))*0.13;
+function tintColor(t){
+  const a=Math.abs(t)/50;
+  return t>=0 ? 'rgb(255,'+Math.round(255-a*90)+',255)' : 'rgb('+Math.round(255-a*55)+',255,'+Math.round(255-a*55)+')';
+}
+const tintLift=t=>1+Math.abs(t)/50*0.08;
+function paint(g,w,h,color,mode){g.save();g.globalCompositeOperation=mode;g.fillStyle=color;g.fillRect(0,0,w,h);g.restore();}
+
+/* ================= 다이얼 ================= */
+function Dial(host){
+  const cv=document.createElement('canvas'); host.innerHTML=''; host.appendChild(cv);
+  const g=cv.getContext('2d');
+  let o=null, drag=null, W=0; const H=64;
+  function size(){const r=host.getBoundingClientRect();W=r.width||innerWidth;cv.width=W*DPR;cv.height=H*DPR;g.setTransform(DPR,0,0,DPR,0,0);draw();}
+  const upp=()=>o.list ? W/3.2 : (W*1.7)/(o.max-o.min);
+  function draw(){
+    g.clearRect(0,0,W,H);
+    if(!o)return;
+    const cx=W/2, p=upp();
+    g.textAlign='center';
+    if(o.list){
+      o.list.forEach((it,i)=>{
+        const x=cx+(i-o.idx)*p; if(x<-100||x>W+100)return;
+        const near=Math.abs(i-o.idx);
+        g.globalAlpha=clamp(1-near*0.42,.22,1);
+        g.fillStyle='#fff'; g.font=(near<.3?'500 ':'400 ')+'13px "Noto Sans KR",sans-serif';
+        g.fillText(it,x,H/2+6);
+      });
+      g.globalAlpha=1;
+    }else{
+      let tick=o.step; while(tick*p<11) tick*=2;
+      const span=(cx+50)/p;
+      const first=Math.ceil((o.value-span)/tick)*tick;
+      for(let v=first; v<=o.value+span; v+=tick){
+        if(v<o.min-1e-9||v>o.max+1e-9)continue;
+        const x=cx+(v-o.value)*p;
+        const major=Math.abs(v/(tick*5)-Math.round(v/(tick*5)))<1e-6;
+        const zero=Math.abs(v-(o.center!=null?o.center:o.min))<1e-6;
+        g.globalAlpha=zero?1:(major?.75:.32);
+        g.fillStyle='#fff';
+        const hh=zero?24:(major?16:9), ww=zero?2:1;
+        g.fillRect(x-ww/2,H/2-hh/2+4,ww,hh);
+      }
+      g.globalAlpha=1;
+    }
+    g.fillStyle='#fff'; g.fillRect(cx-1,4,2,o.list?28:22);
+    g.font='500 13px "Noto Sans KR",sans-serif';
+    g.fillText(o.label(),cx,H-5);
+  }
+  cv.addEventListener('pointerdown',e=>{if(!o)return;cv.setPointerCapture(e.pointerId);drag={x:e.clientX,v:o.list?o.idx:o.value};});
+  cv.addEventListener('pointermove',e=>{
+    if(!drag||!o)return;
+    const dv=(e.clientX-drag.x)/upp();
+    if(o.list){
+      const ni=clamp(drag.v-dv,0,o.list.length-1);
+      const changed=Math.round(ni)!==Math.round(o.idx);
+      o.idx=ni; draw();
+      if(changed){o.onInput&&o.onInput(Math.round(ni));if(navigator.vibrate)navigator.vibrate(3);}
+    }else{
+      const nv=clamp(Math.round((drag.v+dv)/o.step)*o.step,o.min,o.max);
+      if(nv!==o.value){o.value=+nv.toFixed(4);draw();o.onInput&&o.onInput(o.value);if(navigator.vibrate)navigator.vibrate(3);}
+    }
+  });
+  const up=()=>{if(drag&&o&&o.list){o.idx=Math.round(o.idx);draw();o.onInput&&o.onInput(o.idx);}drag=null;};
+  ['pointerup','pointercancel'].forEach(ev=>cv.addEventListener(ev,up));
+  return {set(opt){o=opt;if(o.list&&o.idx==null)o.idx=o.value||0;size();},clear(){o=null;draw();},refresh:draw,size};
+}
+const camDial=Dial($('#camDial')), editDial=Dial($('#editDial'));
+
+/* ================= 카메라 ================= */
+async function start(){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing,width:{ideal:2560},height:{ideal:2560}},audio:false});
+    $('#v').srcObject=stream; track=stream.getVideoTracks()[0];
+    caps=(track.getCapabilities?track.getCapabilities():null)||{};
+    $('#err').classList.add('hide');
+    camEV=null;
+    setupZoom(); buildLens(); applyPreview(); applyFixedSettings();
+    const evOn=!!caps.exposureCompensation;
+    $('#evBtn').classList.toggle('hide',!evOn);
+    if(!evOn){$('#evStrip').classList.add('hide');$('#evBtn').classList.remove('on');}
+  }catch(e){
+    $('#err').classList.remove('hide');
+    $('#err').innerHTML='카메라를 열 수 없습니다.<br>브라우저의 카메라 권한을 허용해 주세요.<br><small style="opacity:.6">'+e.name+'</small>';
+  }
+}
+/* 카메라 기본값 고정: WB 5500K(수동 다이얼 없음) · ISO 50 · 셔터스피드 1/60 (기기가 지원하는 범위 내 best-effort) */
+function applyFixedSettings(){
+  if(!track) return;
+  try{ if(caps.iso) track.applyConstraints({advanced:[{iso:clamp(50,caps.iso.min,caps.iso.max)}]}).catch(()=>{}); }catch(_){}
+  try{
+    if(caps.exposureTime){
+      const unit=caps.exposureTime.max>1000?10000:1;
+      const target=clamp(Math.round(unit/60),caps.exposureTime.min,caps.exposureTime.max);
+      track.applyConstraints({advanced:[{exposureMode:'manual'},{exposureTime:target}]}).catch(()=>{});
+    }
+  }catch(_){}
+}
+function layout(){
+  const {pw,ph}=dims(), f=$('#frame'), st=$('#camStage');
+  const mw=st.clientWidth-8, mh=st.clientHeight-8;
+  let w=mw, h=w*ph/pw; if(h>mh){h=mh;w=h*pw/ph;}
+  f.style.width=w+'px'; f.style.height=h+'px';
+  $('#gridLines').innerHTML='<i style="left:33.3%;top:0;width:1px;height:100%"></i><i style="left:66.6%;top:0;width:1px;height:100%"></i><i style="top:33.3%;left:0;height:1px;width:100%"></i><i style="top:66.6%;left:0;height:1px;width:100%"></i>';
+  layoutEdit();
+}
+function layoutEdit(){
+  const st=$('#editStage'), c=$('#pv'); if(!c.width)return;
+  const mw=st.clientWidth-8, mh=st.clientHeight-8;
+  let w=mw, h=w*c.height/c.width; if(h>mh){h=mh;w=h*c.width/c.height;}
+  $('#wrap').style.width=w+'px'; $('#wrap').style.height=h+'px';
+}
+$('#ratio').onclick=()=>{portrait=!portrait;$('#ratio').textContent=portrait?'3:5':'5:3';layout();};
+$('#flip').onclick=()=>{facing=facing==='user'?'environment':'user';start();};
+$('#grid').onclick=e=>{e.currentTarget.classList.toggle('on');$('#gridLines').classList.toggle('hide');};
+$('#evBtn').onclick=e=>{
+  e.currentTarget.classList.toggle('on');
+  const on=e.currentTarget.classList.contains('on');
+  $('#evStrip').classList.toggle('hide',!on);
+  if(on) selectEV(); else camDial.clear();
+  requestAnimationFrame(()=>{layout();camDial.size();});
+};
+function selectEV(){
+  if(!caps.exposureCompensation) return;
+  const s=(track&&track.getSettings)?track.getSettings():{};
+  if(camEV==null) camEV=(s.exposureCompensation!=null?s.exposureCompensation:0);
+  camDial.set({min:caps.exposureCompensation.min,max:caps.exposureCompensation.max,step:caps.exposureCompensation.step||.1,value:camEV,center:0,
+    label:()=>(camEV>0?'+':'')+(+camEV).toFixed(1)+'EV',
+    onInput:v=>{camEV=v;track.applyConstraints({advanced:[{exposureCompensation:v}]}).catch(()=>{});}});
+}
+function applyPreview(){
+  const v=$('#v');
+  v.style.transform=(facing==='user'?'scaleX(-1) ':'')+(nativeZoom?'':'scale('+camZoom+')');
+  v.style.filter='brightness('+wbLift(camWB).toFixed(3)+')';
+  $('#wbOv').style.background=wbColor(camWB);
+}
+
+/* ---- 줌 : 핀치 + 렌즈 버튼 ---- */
+function setupZoom(){
+  const z=caps.zoom;
+  if(z){nativeZoom=true;zUnit=(z.min>=50)?100:1;zMin=z.min/zUnit;zMax=z.max/zUnit;}
+  else {nativeZoom=false;zUnit=1;zMin=1;zMax=4;}
+  camZoom=clamp(1,zMin,zMax); applyZoom();
+}
+function applyZoom(){
+  $('#zLabel').textContent='×'+(camZoom<10?camZoom.toFixed(1):camZoom.toFixed(0));
+  if(nativeZoom&&track&&caps.zoom) track.applyConstraints({advanced:[{zoom:clamp(camZoom*zUnit,caps.zoom.min,caps.zoom.max)}]}).catch(()=>{});
+  applyPreview();
+  $$('#lensRow button').forEach(b=>b.classList.toggle('on',Math.abs(+b.dataset.z-camZoom)<0.05));
+}
+function buildLens(){
+  const row=$('#lensRow'); row.innerHTML='';
+  let cand=[0.5,0.6,1,2,3,5,10].filter(v=>v>=zMin-1e-6&&v<=zMax+1e-6);
+  if(!cand.length) cand=[1];
+  cand.forEach(v=>{
+    const b=document.createElement('button'); b.dataset.z=v;
+    b.textContent=(v<1?v.toFixed(1):v)+'×';
+    b.onclick=()=>{camZoom=v;applyZoom();};
+    row.append(b);
+  });
+  applyZoom();
+}
+const tdist=e=>Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+let pinch=null;
+const fr=$('#frame');
+fr.addEventListener('touchstart',e=>{if(e.touches.length===2)pinch={d:tdist(e),z:camZoom};},{passive:true});
+fr.addEventListener('touchmove',e=>{if(pinch&&e.touches.length===2){camZoom=clamp(pinch.z*(tdist(e)/pinch.d),zMin,zMax);applyZoom();}},{passive:true});
+fr.addEventListener('touchend',()=>{pinch=null;},{passive:true});
+
+/* ================= 사진첩 ================= */
+$('#galBtn').onclick=openGallery;
+$('#galBack').onclick=()=>{showView('cam');requestAnimationFrame(()=>{layout();camDial.size();});};
+function galleryList(){try{return JSON.parse(localStorage.getItem('pola_gallery')||'[]');}catch(_){return[];}}
+function saveToGallery(url){
+  let g=galleryList(); g.unshift({url,ts:Date.now()}); g=g.slice(0,40);
+  while(g.length){
+    try{localStorage.setItem('pola_gallery',JSON.stringify(g));return;}
+    catch(_){g=g.slice(0,Math.max(0,g.length-5)); if(!g.length)return;}
+  }
+}
+function openGallery(){
+  const grid=$('#galGrid'); grid.innerHTML='';
+  const list=galleryList();
+  if(!list.length){ grid.innerHTML='<div class="hint">저장된 사진이 없습니다.</div>'; }
+  else list.forEach(item=>{
+    const img=document.createElement('img'); img.src=item.url;
+    img.onclick=()=>showOutput(item.url,'gallery');
+    grid.append(img);
+  });
+  showView('gallery');
+}
+
+/* ================= 촬영 ================= */
+$('#shot').onclick=()=>{
+  if(!track)return;
+  if(!isDev()&&used()>=LIMIT){toast('오늘 10장을 모두 사용했습니다');return;}
+  const {pw,ph}=dims(), v=$('#v');
+  shot=document.createElement('canvas'); shot.width=pw; shot.height=ph;
+  const g=shot.getContext('2d');
+  const vw=v.videoWidth, vh=v.videoHeight, t=pw/ph;
+  let sw=vw, sh=vw/t; if(sh>vh){sh=vh;sw=vh*t;}
+  if(!nativeZoom&&camZoom>1){sw/=camZoom;sh/=camZoom;}
+  const sx=(vw-sw)/2, sy=(vh-sh)/2;
+  if(facing==='user'){g.translate(pw,0);g.scale(-1,1);}
+  g.filter='brightness('+wbLift(camWB).toFixed(3)+')';
+  g.drawImage(v,sx,sy,sw,sh,0,0,pw,ph);
+  g.filter='none'; g.setTransform(1,0,0,1,0,0);
+  paint(g,pw,ph,wbColor(camWB),'multiply');
+
+  if(!isDev()) setUsed(used()+1);
+  panX=panY=.5; caption=''; fx='ORIGINAL'; strokes=[];
+  adj={b:0,c:0,s:0,t:0,ti:0,z:100,grain:0,vig:0,fxAmt:100};
+  showView('edit');
+  render(); setStage('adj');
+};
+
+/* ================= 그레인 / 비네팅 ================= */
+let noiseTile=null;
+function noise(){
+  if(noiseTile)return noiseTile;
+  const n=document.createElement('canvas');n.width=n.height=160;
+  const g=n.getContext('2d'),d=g.createImageData(160,160);
+  for(let i=0;i<d.data.length;i+=4){const v=180+Math.random()*150;d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255;}
+  g.putImageData(d,0,0);return noiseTile=n;
+}
+function grain(g,w,h,a){if(a<=0)return;g.save();g.globalAlpha=a;g.globalCompositeOperation='overlay';g.fillStyle=g.createPattern(noise(),'repeat');g.fillRect(0,0,w,h);g.restore();}
+function vignette(g,w,h,a){
+  if(a<=0)return;
+  const r=g.createRadialGradient(w/2,h/2,Math.min(w,h)*.28,w/2,h/2,Math.max(w,h)*.72);
+  r.addColorStop(0,'rgba(0,0,0,0)');r.addColorStop(1,'rgba(0,0,0,'+a+')');
+  g.save();g.globalCompositeOperation='multiply';g.fillStyle=r;g.fillRect(0,0,w,h);g.restore();
+}
+
+/* ================= 필터 ================= */
+const PRESETS={
+  ORIGINAL:{},
+  FILM   :{f:'saturate(1.12) contrast(1.06) brightness(1.03) sepia(.12)',fade:.06,grain:.12},
+  CINEMA :{f:'contrast(1.20) saturate(.92) brightness(.98)',teal:.30,warm:.12,vig:.32},
+  MONO   :{f:'grayscale(1) contrast(1.20) brightness(1.03)',grain:.14,vig:.18},
+  VINTAGE:{f:'sepia(.34) saturate(.88) contrast(.92) brightness(1.07)',fade:.10,vig:.26,grain:.08},
+  COOL   :{f:'saturate(1.06) contrast(1.08)',cool:.30}
+};
+const FXKEYS=Object.keys(PRESETS);
+const scaleFilter=(str,a)=>str.replace(/([a-z-]+)\(([-\d.]+)(%|deg)?\)/g,(m,fn,v,u)=>{
+  const neutral=(fn==='sepia'||fn==='grayscale'||fn==='hue-rotate')?0:1;
+  return fn+'('+(neutral+(+v-neutral)*a).toFixed(3)+(u||'')+')';
+});
+
+/* ================= 사진 레이어 ================= */
+const off=document.createElement('canvas');
+function photoLayer(pw,ph){
+  off.width=pw; off.height=ph;
+  const g=off.getContext('2d');
+  const z=adj.z/100, sw=shot.width/z, sh=shot.height/z;
+  const sx=clamp(panX*(shot.width-sw),0,shot.width-sw), sy=clamp(panY*(shot.height-sh),0,shot.height-sh);
+  const p=PRESETS[fx]||{}, amt=adj.fxAmt/100;
+  const lift=wbLift(5500+adj.t*70)*tintLift(adj.ti);
+  g.filter='brightness('+((100+adj.b)/100*lift).toFixed(3)+') contrast('+(100+adj.c)+'%) saturate('+(100+adj.s)+'%)'+(p.f&&amt>0?' '+scaleFilter(p.f,amt):'');
+  g.drawImage(shot,sx,sy,sw,sh,0,0,pw,ph);
+  g.filter='none';
+  if(adj.t) paint(g,pw,ph,wbColor(5500+adj.t*70),'multiply');
+  if(adj.ti) paint(g,pw,ph,tintColor(adj.ti),'multiply');
+  if(p.teal) paint(g,pw,ph,'rgba(0,90,130,'+(p.teal*amt).toFixed(3)+')','soft-light');
+  if(p.warm) paint(g,pw,ph,'rgba(255,160,70,'+(p.warm*amt).toFixed(3)+')','soft-light');
+  if(p.cool) paint(g,pw,ph,'rgba(70,150,255,'+(p.cool*amt).toFixed(3)+')','soft-light');
+  if(p.fade) paint(g,pw,ph,'rgba(255,255,255,'+(p.fade*amt).toFixed(3)+')','source-over');
+  vignette(g,pw,ph,(p.vig?p.vig*amt:0)+adj.vig/100*.55);
+  grain(g,pw,ph,(p.grain?p.grain*amt:0)+adj.grain/100*.25);
+  return off;
+}
+
+/* ================= 폴라로이드 그리기 (텍스트 + 펜 동시 표시) ================= */
+function metaText(){
+  const n=new Date(), p=x=>String(x).padStart(2,'0'), a=[];
+  if(metaOn.date) a.push(n.getFullYear()+'.'+p(n.getMonth()+1)+'.'+p(n.getDate()));
+  if(metaOn.time) a.push(p(n.getHours())+':'+p(n.getMinutes()));
+  if(metaOn.wx) a.push(wx?wx.icon+' '+wx.temp+'°C':wxIcon);
+  return a.join('   ');
+}
+function wrapText(g,text,maxW){
+  let lines=[],line='';
+  for(const ch of [...text]){const t=line+ch;if(g.measureText(t).width>maxW&&line){lines.push(line);line=ch;}else line=t;}
+  if(line)lines.push(line);
+  return lines.slice(0,2);
+}
+function render(){
+  if(!shot)return;
+  const {pw,ph}=dims(), c=$('#pv');
+  c.width=pw+PAD*2; c.height=ph+PAD+BOT;
+  const g=c.getContext('2d');
+  g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height);
+  g.drawImage(photoLayer(pw,ph),PAD,PAD);
+  g.strokeStyle='rgba(0,0,0,.12)'; g.lineWidth=2; g.strokeRect(PAD,PAD,pw,ph);
+  const base=PAD+ph, cx=c.width/2;
+  if(caption){
+    g.fillStyle='#111'; g.textAlign='center';
+    g.font = font==='pen'?'400 96px "Nanum Pen Script", cursive':'500 52px "Noto Sans KR", sans-serif';
+    const lines=wrapText(g,caption,c.width-PAD*2), lh=font==='pen'?92:64;
+    lines.forEach((l,i)=>g.fillText(l,cx,base+(font==='pen'?140:130)+i*lh));
+  }
+  if(penCv) g.drawImage(penCv,0,base,c.width,BOT);
+  const m=metaText();
+  if(m){g.textAlign='center';g.font='400 34px "Noto Sans KR", sans-serif';g.fillStyle='#555';g.fillText(m,cx,base+BOT-64);}
+  layoutEdit();
+}
+
+/* ================= 확대 시 드래그로 위치 이동 + 핀치 확대 ================= */
+let epan=null, epinch=null;
+const pv=$('#pv');
+pv.addEventListener('pointerdown',e=>{if(adj.z<=100)return;epan={x:e.clientX,y:e.clientY,px:panX,py:panY};pv.setPointerCapture(e.pointerId);});
+pv.addEventListener('pointermove',e=>{
+  if(!epan)return;
+  const z=adj.z/100, r=pv.getBoundingClientRect();
+  panX=clamp(epan.px-(e.clientX-epan.x)/r.width/z*1.8,0,1);
+  panY=clamp(epan.py-(e.clientY-epan.y)/r.height/z*1.8,0,1);
+  render();
+});
+addEventListener('pointerup',()=>{epan=null;});
+pv.addEventListener('touchstart',e=>{if(e.touches.length===2)epinch={d:tdist(e),z:adj.z};},{passive:true});
+pv.addEventListener('touchmove',e=>{if(epinch&&e.touches.length===2){adj.z=clamp(Math.round(epinch.z*(tdist(e)/epinch.d)),100,300);render();editDial.refresh();}},{passive:true});
+pv.addEventListener('touchend',()=>{epinch=null;},{passive:true});
+
+/* ================= 편집 단계 : 보정(adj) → 멘트(cap) ================= */
+const ADJ_ITEMS=[
+  {k:'fx',n:'필터'},{k:'fxAmt',n:'강도'},{k:'z',n:'확대'},
+  {k:'b',n:'밝기'},{k:'c',n:'대비'},{k:'s',n:'채도'},
+  {k:'t',n:'색온도'},{k:'ti',n:'틴트'},{k:'grain',n:'그레인'},{k:'vig',n:'비네팅'},
+  {k:'reset',n:'초기화'}
+];
+const RANGE={fxAmt:[0,100,1,100],z:[100,300,5,100],b:[-50,50,1,0],c:[-50,50,1,0],s:[-80,80,1,0],t:[-50,50,1,0],ti:[-50,50,1,0],grain:[0,100,1,0],vig:[0,100,1,0]};
+let stage='adj';
+function setStage(s){
+  stage=s;
+  const L=$('#eLeft'), R=$('#eRight');
+  if(s==='adj'){
+    L.textContent='다시 찍기'; L.onclick=retake;
+    R.textContent='다음'; R.disabled=false; R.onclick=()=>setStage('cap');
+    $('#editChips').classList.remove('hide'); $('#editDial').classList.remove('hide');
+    $('#capPanel').classList.add('hide');
+    buildEditChips(); selectEdit('fx');
+  }else{
+    L.textContent='보정으로'; L.onclick=()=>setStage('adj');
+    R.textContent='확정'; R.onclick=confirmCaption;
+    $('#editChips').classList.add('hide'); $('#editDial').classList.add('hide'); editDial.clear();
+    $('#capPanel').classList.remove('hide');
+    buildCapPanel(); updateCapConfirm();
+  }
+  requestAnimationFrame(layoutEdit);
+}
+function retake(){ if(!isDev())setUsed(used()-1); showView('cam'); requestAnimationFrame(layout); }
+function buildEditChips(){
+  const c=$('#editChips'); c.innerHTML='';
+  ADJ_ITEMS.forEach(it=>{
+    const b=document.createElement('button'); b.textContent=it.n; b.dataset.k=it.k;
+    b.onclick=()=>selectEdit(it.k); c.append(b);
+  });
+}
+function selectEdit(k){
+  if(k==='reset'){
+    adj={b:0,c:0,s:0,t:0,ti:0,z:100,grain:0,vig:0,fxAmt:100};fx='ORIGINAL';panX=panY=.5;render();
+    toast('보정을 초기화했습니다'); k='fx';
+  }
+  $$('#editChips button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
+  if(k==='fx'){
+    editDial.set({list:FXKEYS,idx:FXKEYS.indexOf(fx),label:()=>fx,onInput:i=>{fx=FXKEYS[i];render();}});
+    return;
+  }
+  const r=RANGE[k];
+  const fmt=v=>k==='z'?'×'+(v/100).toFixed(1)
+            :k==='t'?(v>0?'따뜻 +'+v:v<0?'차갑 '+v:'중립 0')
+            :k==='ti'?(v>0?'마젠타 +'+v:v<0?'그린 '+v:'중립 0')
+            :(v>0?'+'+v:''+v);
+  editDial.set({min:r[0],max:r[1],step:r[2],value:adj[k],center:r[3],
+    label:()=>fmt(adj[k]), onInput:v=>{adj[k]=v;render();}});
+}
+
+/* ================= 멘트 : 텍스트 + 펜을 함께 사용 (필수 입력) ================= */
+let strokes=[], cur=null, penW=8, wide=false, erasing=false, penCv=null, penCtx=null;
+function hasContent(){return caption.trim().length>0 || strokes.length>0;}
+function updateCapConfirm(){ const b=$('#eRight'); if(stage==='cap') b.disabled=!hasContent(); }
+function repaintPen(){
+  if(!penCtx)return;
+  const {pw}=dims(), W=pw+PAD*2, H=BOT;
+  penCtx.clearRect(0,0,W,H);
+  penCtx.lineCap='round'; penCtx.lineJoin='round';
+  strokes.forEach(s=>{
+    penCtx.save();
+    penCtx.globalCompositeOperation=s.erase?'destination-out':'source-over';
+    penCtx.strokeStyle='#111'; penCtx.lineWidth=s.w;
+    penCtx.beginPath(); s.p.forEach((q,i)=>i?penCtx.lineTo(q[0],q[1]):penCtx.moveTo(q[0],q[1])); penCtx.stroke();
+    penCtx.restore();
+  });
+  render();
+}
+function buildCapPanel(){
+  const b=$('#capPanel'); b.innerHTML='';
+  const inp=document.createElement('input'); inp.type='text'; inp.id='capIn';
+  inp.placeholder='폴라로이드에 남길 한 줄'; inp.value=caption; inp.maxLength=40;
+  const applyFont=()=>{inp.style.fontFamily=font==='pen'?'"Nanum Pen Script",cursive':'"Noto Sans KR",sans-serif';inp.style.fontSize=font==='pen'?'30px':'18px';};
+  inp.oninput=()=>{caption=inp.value;render();updateCapConfirm();};
+  const fontSeg=document.createElement('div'); fontSeg.className='penTools';
+  [['필기체','pen'],['타이핑','type']].forEach(([n,f])=>{
+    const x=document.createElement('button'); x.textContent=n; if(font===f)x.classList.add('on');
+    x.onclick=()=>{font=f;[...fontSeg.children].forEach(y=>y.classList.remove('on'));x.classList.add('on');applyFont();render();};
+    fontSeg.append(x);
+  });
+  const scroll=document.createElement('div'); scroll.className='penScroll';
+  const cv=document.createElement('canvas'); cv.id='capPen';
+  const {pw}=dims(), W=pw+PAD*2, H=BOT;
+  cv.width=W; cv.height=H; scroll.append(cv);
+  penCv=cv; penCtx=cv.getContext('2d');
+  const fit=()=>{const bw=scroll.clientWidth-4||300,w=wide?bw*2:bw;cv.style.width=w+'px';cv.style.height=(w*H/W)+'px';};
+  const pt=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height];};
+  cv.addEventListener('pointerdown',e=>{e.preventDefault();cur={w:erasing?penW*3:penW,p:[pt(e)],erase:erasing};strokes.push(cur);cv.setPointerCapture(e.pointerId);});
+  cv.addEventListener('pointermove',e=>{if(!cur)return;cur.p.push(pt(e));repaintPen();});
+  ['pointerup','pointercancel'].forEach(ev=>cv.addEventListener(ev,()=>{if(cur)updateCapConfirm();cur=null;}));
+  const tools=document.createElement('div'); tools.className='penTools';
+  [['가는',4],['보통',8],['굵은',15]].forEach(([n,w])=>{
+    const x=document.createElement('button'); x.textContent=n; if(penW===w&&!erasing)x.classList.add('on');
+    x.onclick=()=>{penW=w;erasing=false;[...tools.children].forEach(y=>y.classList.remove('on'));x.classList.add('on');};
+    tools.append(x);
+  });
+  const er=document.createElement('button'); er.textContent='지우개';
+  er.onclick=()=>{erasing=!erasing;[...tools.children].forEach(y=>y.classList.remove('on'));er.classList.toggle('on',erasing);};
+  const u=document.createElement('button'); u.textContent='되돌리기'; u.onclick=()=>{strokes.pop();repaintPen();updateCapConfirm();};
+  const cl=document.createElement('button'); cl.textContent='전체 지우기'; cl.onclick=()=>{strokes=[];repaintPen();updateCapConfirm();};
+  const wd=document.createElement('button'); wd.textContent='넓게 쓰기'; if(wide)wd.classList.add('on');
+  wd.onclick=()=>{wide=!wide;wd.classList.toggle('on');fit();};
+  tools.append(er,u,cl,wd);
+  const metaRow=document.createElement('div'); metaRow.className='metaRow';
+  [['date','날짜'],['time','시간'],['wx','날씨']].forEach(([k,n])=>{
+    const x=document.createElement('button'); x.textContent=n; if(metaOn[k])x.classList.add('on');
+    x.onclick=()=>{metaOn[k]=!metaOn[k];x.classList.toggle('on',metaOn[k]);if(k==='wx'&&metaOn.wx&&!wx)getWx();render();};
+    metaRow.append(x);
+  });
+  const tip=document.createElement('div'); tip.className='hint';
+  tip.textContent='텍스트와 펜 그림은 함께 표시됩니다. 최소 한 가지는 입력해야 다음으로 넘어갑니다.';
+  b.append(inp,fontSeg,scroll,tools,metaRow,tip);
+  applyFont(); repaintPen(); setTimeout(fit,0);
+}
+const WMO=c=>c===0?'☀':c<3?'⛅':c<45?'☁':c<50?'🌫':c<60?'🌦':c<70?'☂':c<80?'❄':c<83?'🌧':c<87?'🌨':'⛈';
+function getWx(){
+  if(!navigator.geolocation)return;
+  navigator.geolocation.getCurrentPosition(async p=>{
+    try{
+      const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude='+p.coords.latitude.toFixed(3)+'&longitude='+p.coords.longitude.toFixed(3)+'&current=temperature_2m,weather_code');
+      const j=await r.json();
+      wx={temp:Math.round(j.current.temperature_2m),icon:WMO(j.current.weather_code)};
+      render();
+    }catch(_){}
+  },()=>{},{timeout:8000,maximumAge:600000});
+}
+
+/* ================= 확정 → 다운로드(잠금, 뒤로가기 없음) ================= */
+function confirmCaption(){
+  if(!hasContent())return;
+  render();
+  const url=$('#pv').toDataURL('image/jpeg',0.93);
+  saveToGallery(url);
+  showOutput(url,'cam');
+}
+let lastUrl=null;
+function showOutput(url,from){
+  lastUrl=url;
+  $('#outImg').src=url;
+  const bar=$('#outBar'); bar.innerHTML='';
+  if(from==='gallery'){
+    const back=document.createElement('button'); back.textContent='← 사진첩';
+    back.onclick=()=>openGallery();
+    bar.append(back);
+  }
+  const dl=document.createElement('button'); dl.textContent='다운로드';
+  dl.onclick=()=>{
+    const a=document.createElement('a');a.href=lastUrl;a.download='polaroid_'+Date.now()+'.jpg';a.click();
+    toast('저장 완료');
+    if(from==='cam') setTimeout(goHome,2000);
+  };
+  bar.append(dl);
+  showView('out');
+}
+function goHome(){
+  shot=null; lastUrl=null; caption=''; fx='ORIGINAL'; strokes=[];
+  adj={b:0,c:0,s:0,t:0,ti:0,z:100,grain:0,vig:0,fxAmt:100};
+  panX=panY=.5;
+  $('#outImg').removeAttribute('src');
+  showView('cam');
+  requestAnimationFrame(()=>{layout();camDial.size();});
+}
+
+/* ================= init ================= */
+addEventListener('resize',()=>{layout();camDial.size();editDial.size();});
+updateCount(); layout(); start();
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{if(shot)render();});
+</script>
+</body>
+</html>
